@@ -1090,6 +1090,107 @@ ${step.explanation}
                 </div>
               </div>
             )}
+            {/* Riemann Controls */}
+            {showRiemannControls && areaPixel > 0 && !isProcessing && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-2xl shadow-xl border border-blue-200">
+                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                  <span className="mr-2">⚙️</span> Kontrol Visualisasi Riemann
+                </h3>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Pilih Metode Riemann:
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        {
+                          id: "left",
+                          name: "Kiri",
+                          color: "red",
+                          desc: "Underestimate jika f naik",
+                        },
+                        {
+                          id: "midpoint",
+                          name: "Tengah",
+                          color: "blue",
+                          desc: "Paling akurat",
+                        },
+                        {
+                          id: "right",
+                          name: "Kanan",
+                          color: "green",
+                          desc: "Overestimate jika f naik",
+                        },
+                      ].map((method) => (
+                        <button
+                          key={method.id}
+                          onClick={() => setRiemannMethod(method.id)}
+                          className={`py-3 px-4 rounded-xl font-medium transition-all flex flex-col items-center ${
+                            riemannMethod === method.id
+                              ? method.id === "left"
+                                ? "bg-red-100 border-2 border-red-500 text-red-700"
+                                : method.id === "right"
+                                ? "bg-green-100 border-2 border-green-500 text-green-700"
+                                : "bg-blue-100 border-2 border-blue-500 text-blue-700"
+                              : "bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          <span className="text-lg mb-1">
+                            {method.id === "left"
+                              ? "⬅️"
+                              : method.id === "right"
+                              ? "➡️"
+                              : "⏺️"}
+                          </span>
+                          <span>{method.name}</span>
+                          <span className="text-xs mt-1 opacity-75">
+                            {method.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="text-sm font-medium text-gray-700">
+                        Jumlah Interval (n):
+                      </label>
+                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">
+                        {riemannIntervals}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="4"
+                      max="50"
+                      step="1"
+                      value={riemannIntervals}
+                      onChange={(e) =>
+                        setRiemannIntervals(parseInt(e.target.value))
+                      }
+                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-2">
+                      <span className="text-red-600">Kasar (4)</span>
+                      <span className="text-blue-600">Optimal (10-20)</span>
+                      <span className="text-green-600">Halus (50)</span>
+                    </div>
+                  </div>
+
+                  {!showStepByStep && calculationSteps.length > 0 && (
+                    <button
+                      onClick={() => setShowStepByStep(true)}
+                      className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all flex items-center justify-center"
+                    >
+                      <span className="mr-2">📖</span>
+                      Tampilkan Langkah Perhitungan
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Langkah Perhitungan Riemann */}
             {showStepByStep && calculationSteps.length > 0 && !isProcessing && (
@@ -1256,108 +1357,6 @@ ${step.explanation}
                     Gunakan kontrol di samping untuk mengubah metode atau jumlah
                     interval
                   </span>
-                </div>
-              </div>
-            )}
-
-            {/* Riemann Controls */}
-            {showRiemannControls && areaPixel > 0 && !isProcessing && (
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-2xl shadow-xl border border-blue-200">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                  <span className="mr-2">⚙️</span> Kontrol Visualisasi Riemann
-                </h3>
-
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Pilih Metode Riemann:
-                    </label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        {
-                          id: "left",
-                          name: "Kiri",
-                          color: "red",
-                          desc: "Underestimate jika f naik",
-                        },
-                        {
-                          id: "midpoint",
-                          name: "Tengah",
-                          color: "blue",
-                          desc: "Paling akurat",
-                        },
-                        {
-                          id: "right",
-                          name: "Kanan",
-                          color: "green",
-                          desc: "Overestimate jika f naik",
-                        },
-                      ].map((method) => (
-                        <button
-                          key={method.id}
-                          onClick={() => setRiemannMethod(method.id)}
-                          className={`py-3 px-4 rounded-xl font-medium transition-all flex flex-col items-center ${
-                            riemannMethod === method.id
-                              ? method.id === "left"
-                                ? "bg-red-100 border-2 border-red-500 text-red-700"
-                                : method.id === "right"
-                                ? "bg-green-100 border-2 border-green-500 text-green-700"
-                                : "bg-blue-100 border-2 border-blue-500 text-blue-700"
-                              : "bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          <span className="text-lg mb-1">
-                            {method.id === "left"
-                              ? "⬅️"
-                              : method.id === "right"
-                              ? "➡️"
-                              : "⏺️"}
-                          </span>
-                          <span>{method.name}</span>
-                          <span className="text-xs mt-1 opacity-75">
-                            {method.desc}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <label className="text-sm font-medium text-gray-700">
-                        Jumlah Interval (n):
-                      </label>
-                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">
-                        {riemannIntervals}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="4"
-                      max="50"
-                      step="1"
-                      value={riemannIntervals}
-                      onChange={(e) =>
-                        setRiemannIntervals(parseInt(e.target.value))
-                      }
-                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-2">
-                      <span className="text-red-600">Kasar (4)</span>
-                      <span className="text-blue-600">Optimal (10-20)</span>
-                      <span className="text-green-600">Halus (50)</span>
-                    </div>
-                  </div>
-
-                  {!showStepByStep && calculationSteps.length > 0 && (
-                    <button
-                      onClick={() => setShowStepByStep(true)}
-                      className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all flex items-center justify-center"
-                    >
-                      <span className="mr-2">📖</span>
-                      Tampilkan Langkah Perhitungan
-                    </button>
-                  )}
                 </div>
               </div>
             )}
