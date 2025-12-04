@@ -27,7 +27,7 @@ export default function App() {
   const [areaPixel, setAreaPixel] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [riemannMethod, setRiemannMethod] = useState("midpoint");
-  const [riemannIntervals, setRiemannIntervals] = useState(10);
+  const [riemannIntervals, setRiemannIntervals] = useState(20); // Default ke 20
   const [riemannData, setRiemannData] = useState(null);
   const [showRiemannGraph, setShowRiemannGraph] = useState(false);
   const [mathExplanation, setMathExplanation] = useState("");
@@ -37,12 +37,14 @@ export default function App() {
   const [showStepByStep, setShowStepByStep] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [calculationHistory, setCalculationHistory] = useState([]);
+  const [totalRiemannArea, setTotalRiemannArea] = useState(0);
 
   const previewCanvasRef = useRef(null);
   const processedCanvasRef = useRef(null);
   const riemannCanvasRef = useRef(null);
 
   const formatNumber = (num) => {
+    if (typeof num !== "number" || isNaN(num)) return "0";
     return Math.round(num)
       .toString()
       .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -51,17 +53,17 @@ export default function App() {
   const formatNumberWithDecimal = (num, decimalPlaces = 2) => {
     if (typeof num !== "number" || isNaN(num)) return "0";
 
-    const rounded = Math.round(num);
-    const formatted = rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const [integerPart, decimalPart = ""] = num
+      .toFixed(decimalPlaces)
+      .split(".");
 
-    if (decimalPlaces > 0) {
-      const decimalPart = (num - rounded).toFixed(decimalPlaces).substring(2);
-      if (decimalPart !== "00") {
-        return `${formatted},${decimalPart}`;
-      }
+    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+    if (decimalPlaces > 0 && decimalPart && decimalPart !== "00") {
+      return `${formattedInteger}.${decimalPart}`;
     }
 
-    return formatted;
+    return formattedInteger;
   };
 
   const onDrop = useCallback((acceptedFiles) => {
@@ -86,6 +88,7 @@ export default function App() {
     setCalculationHistory([]);
     setShowStepByStep(true);
     setCurrentStep(0);
+    setTotalRiemannArea(0);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -107,6 +110,7 @@ export default function App() {
         const data = [];
         const steps = [];
         const history = [];
+        let totalRiemannArea = 0;
 
         // ================ LANGKAH 1: DASAR INTEGRAL ================
         steps.push({
@@ -198,7 +202,6 @@ f(x) = ${formatNumberWithDecimal(
             "Fungsi sinus memberikan kurva halus yang baik untuk demonstrasi metode Riemann.",
         });
 
-        let totalRiemannArea = 0;
         const intervalCalculations = [];
 
         // ================ LANGKAH 5: PERHITUNGAN DETAIL SETIAP INTERVAL ================
@@ -207,7 +210,7 @@ f(x) = ${formatNumberWithDecimal(
           const right = (i + 1) * intervalWidth;
           let x, height;
 
-          // Fungsi untuk visualisasi
+          // Fungsi untuk visualisasi - menggunakan sinus yang dinormalisasi
           const func = (pos) =>
             Math.sin((pos * Math.PI) / intervals) * (area / intervals) * 2;
 
@@ -221,6 +224,7 @@ f(x) = ${formatNumberWithDecimal(
               height = func(i + 1);
               break;
             case "midpoint":
+            default:
               x = (left + right) / 2;
               height = func(i + 0.5);
               break;
@@ -304,6 +308,12 @@ Interval ${calc.interval}:
           }
         });
 
+        if (intervals > 5) {
+          intervalCalculationText += `\n... dan ${
+            intervals - 5
+          } interval lainnya`;
+        }
+
         steps.push({
           step: 5,
           title: "Perhitungan Detail Setiap Interval",
@@ -351,14 +361,16 @@ Error Relatif: ${errorPercentage.toFixed(2)}%
 
 Analisis:
 - ${
-            errorPercentage < 1
+            errorPercentage < 0.5
               ? "Sangat akurat"
-              : errorPercentage < 5
+              : errorPercentage < 2
               ? "Cukup akurat"
-              : "Kurang akurat"
+              : errorPercentage < 5
+              ? "Kurang akurat"
+              : "Kurang akurat, tingkatkan interval"
           }
 - ${
-            intervals < 20
+            intervals < 50
               ? "Tambah jumlah interval untuk mengurangi error"
               : "Jumlah interval sudah optimal"
           }`,
@@ -418,17 +430,27 @@ Metode Tengah: A ≈ Σ f((xᵢ₋₁ + xᵢ)/2) Δx
 Metode Kanan: A ≈ Σ f(xᵢ) Δx`,
           calculation: `
 Estimasi untuk n = ${intervals}:
-- Metode Kiri: ${formatNumberWithDecimal(area * 0.95, 2)} pixel² (underestimate)
-- Metode Tengah: ${formatNumberWithDecimal(
-            totalRiemannArea,
+- Metode Kiri: ${formatNumberWithDecimal(
+            totalRiemannArea * (riemannMethod === "left" ? 1 : 0.95),
             2
-          )} pixel² (paling akurat)
-- Metode Kanan: ${formatNumberWithDecimal(area * 1.05, 2)} pixel² (overestimate)
+          )} pixel² ${riemannMethod === "left" ? "" : "(estimasi)"}
+- Metode Tengah: ${formatNumberWithDecimal(
+            totalRiemannArea * (riemannMethod === "midpoint" ? 1 : 0.99),
+            2
+          )} pixel² ${riemannMethod === "midpoint" ? "" : "(estimasi)"}
+- Metode Kanan: ${formatNumberWithDecimal(
+            totalRiemannArea * (riemannMethod === "right" ? 1 : 1.05),
+            2
+          )} pixel² ${riemannMethod === "right" ? "" : "(estimasi)"}
 
 Akurasi relatif:
-1. Tengah (terbaik) - Error: ${errorPercentage.toFixed(2)}%
-2. Kiri - Error: ${Math.abs(((area - area * 0.95) / area) * 100).toFixed(2)}%
-3. Kanan - Error: ${Math.abs(((area - area * 1.05) / area) * 100).toFixed(2)}%`,
+1. Tengah (terbaik) - Error: ${errorPercentage.toFixed(2)}
+2. Kiri - Error: ${Math.abs(
+            ((area - totalRiemannArea * 0.95) / area) * 100
+          ).toFixed(2)}
+3. Kanan - Error: ${Math.abs(
+            ((area - totalRiemannArea * 1.05) / area) * 100
+          ).toFixed(2)}`,
           explanation:
             "Metode titik tengah umumnya memberikan hasil terbaik untuk fungsi kontinu.",
         });
@@ -436,6 +458,7 @@ Akurasi relatif:
         setRiemannData(data);
         setCalculationSteps(steps);
         setCalculationHistory(history);
+        setTotalRiemannArea(totalRiemannArea);
 
         // Generate comprehensive math explanation
         let explanation = `### Analisis Integral Lengkap\n\n`;
@@ -471,24 +494,34 @@ Akurasi relatif:
           area,
           2
         )} pixel²\n`;
-        explanation += `- Error: ${errorPercentage.toFixed(2)}%\n`;
+        explanation += `- Estimasi Riemann: ${formatNumberWithDecimal(
+          totalRiemannArea,
+          2
+        )} pixel²\n`;
+        explanation += `- Error: ${errorPercentage.toFixed(2)}\n`;
         explanation += `- Status: ${
-          errorPercentage < 1
+          errorPercentage < 0.5
             ? "Sangat Akurat"
-            : errorPercentage < 5
+            : errorPercentage < 2
             ? "Cukup Akurat"
+            : errorPercentage < 5
+            ? "Kurang Akurat"
             : "Perlu Lebih Banyak Interval"
         }\n\n`;
 
         explanation += `**5. Prinsip Limit:**\n`;
         explanation += `Ketika n → ∞ dan Δx → 0, maka Rₙ → ∫ₐᵇ f(x) dx\n`;
+        explanation += `Dengan n = ${intervals}, Δx = ${formatNumberWithDecimal(
+          intervalWidth,
+          4
+        )} pixel\n`;
 
         setMathExplanation(explanation);
 
         drawRiemannVisualization(data, area, intervals, totalRiemannArea);
       } catch (err) {
         console.error("Error generating Riemann data:", err);
-        setError("Gagal menghasilkan data Riemann");
+        setError("Gagal menghasilkan data Riemann: " + err.message);
       }
     },
     [riemannMethod, riemannIntervals, formatNumberWithDecimal]
@@ -524,7 +557,8 @@ Akurasi relatif:
     ctx.lineWidth = 0.5;
 
     // Hitung maxHeight terlebih dahulu
-    const maxHeight = Math.max(...data.map((d) => d.height)) * 1.2;
+    const maxHeight = Math.max(...data.map((d) => Math.abs(d.height))) * 1.5;
+    const adjustedMaxHeight = Math.max(maxHeight, (totalArea / intervals) * 3);
 
     // Vertical grid lines
     for (let i = 0; i <= 10; i++) {
@@ -558,7 +592,7 @@ Akurasi relatif:
       if (i > 0 && i < 10) {
         ctx.fillStyle = "#666";
         ctx.font = "10px Arial";
-        ctx.fillText(`${Math.round((i * maxHeight) / 10)}`, 30, y + 3);
+        ctx.fillText(`${Math.round((i * adjustedMaxHeight) / 10)}`, 30, y + 3);
       }
     }
 
@@ -577,9 +611,8 @@ Akurasi relatif:
     ctx.lineWidth = 3;
     ctx.beginPath();
 
-    // maxHeight sudah dihitung di atas
     const xScale = (width - 100) / totalArea;
-    const yScale = (height - 100) / maxHeight;
+    const yScale = (height - 100) / adjustedMaxHeight;
 
     for (let i = 0; i <= width - 100; i++) {
       const x = i / xScale;
@@ -605,12 +638,27 @@ Akurasi relatif:
 
       const isHighlighted = i < 3 && showStepByStep;
 
-      ctx.fillStyle = isHighlighted
-        ? "rgba(59, 130, 246, 0.5)"
-        : "rgba(59, 130, 246, 0.3)";
+      // Adjust rectangle color based on height (positive/negative)
+      const alpha = intervals > 30 ? 0.2 : intervals > 20 ? 0.3 : 0.4;
+      ctx.fillStyle =
+        d.height >= 0
+          ? isHighlighted
+            ? "rgba(59, 130, 246, 0.5)"
+            : `rgba(59, 130, 246, ${alpha})`
+          : isHighlighted
+          ? "rgba(239, 68, 68, 0.5)"
+          : `rgba(239, 68, 68, ${alpha})`;
+
       ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
 
-      ctx.strokeStyle = isHighlighted ? "#1D4ED8" : "#3B82F6";
+      ctx.strokeStyle =
+        d.height >= 0
+          ? isHighlighted
+            ? "#1D4ED8"
+            : "#3B82F6"
+          : isHighlighted
+          ? "#DC2626"
+          : "#EF4444";
       ctx.lineWidth = isHighlighted ? 2 : 1;
       ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
 
@@ -675,6 +723,7 @@ Akurasi relatif:
     ctx.fillStyle = "#333";
     ctx.fillText("Persegi panjang Riemann", width - 125, 87);
   };
+
   const processImageAutomatically = () => {
     if (!imgSrc) return;
 
@@ -759,21 +808,17 @@ Akurasi relatif:
           `**Total Luas:** ${formatNumberWithDecimal(totalArea, 2)} pixel²`;
 
         // Tambahkan step OpenCV ke calculation steps
-        if (calculationSteps.length > 0) {
-          const opencvStep = {
-            step: 0,
-            title: "Proses OpenCV - Deteksi Kontur",
-            description:
-              "Analisis bagaimana OpenCV menghitung luas dari gambar.",
-            formula: "cv.contourArea() menggunakan integral numerik",
-            calculation: opencvCalculation,
-            explanation:
-              "OpenCV menggunakan algoritma Green's Theorem untuk menghitung luas kontur secara akurat.",
-          };
+        const opencvStep = {
+          step: 0,
+          title: "Proses OpenCV - Deteksi Kontur",
+          description: "Analisis bagaimana OpenCV menghitung luas dari gambar.",
+          formula: "cv.contourArea() menggunakan integral numerik",
+          calculation: opencvCalculation,
+          explanation:
+            "OpenCV menggunakan algoritma Green's Theorem untuk menghitung luas kontur secara akurat.",
+        };
 
-          // Insert OpenCV step at the beginning
-          setCalculationSteps((prev) => [opencvStep, ...prev]);
-        }
+        setCalculationSteps([opencvStep]);
 
         src.delete();
         gray.delete();
@@ -851,13 +896,7 @@ ${
     : ""
 }
 
-TOTAL RIEMANN SUM: ${formatNumberWithDecimal(
-      calculationHistory.reduce((sum, h) => {
-        const area = parseFloat(h.calculation.split("=").pop());
-        return sum + (isNaN(area) ? 0 : area);
-      }, 0),
-      2
-    )} pixel²
+ TOTAL RIEMANN SUM: ${formatNumberWithDecimal(totalRiemannArea, 2)} pixel²
 
 ANALISIS MATEMATIS LENGKAP:
 ==========================
@@ -917,6 +956,7 @@ ${step.explanation}
     setCalculationHistory([]);
     setShowStepByStep(true);
     setCurrentStep(0);
+    setTotalRiemannArea(0);
   };
 
   const nextStep = () => {
@@ -944,6 +984,7 @@ ${step.explanation}
           </h1>
           <p className="text-gray-600 text-lg mt-3">
             Unggah gambar PNG → Hitung luas otomatis → Visualisasi Riemann
+            (n=4-100)
           </p>
         </div>
 
@@ -1090,6 +1131,7 @@ ${step.explanation}
                 </div>
               </div>
             )}
+
             {/* Riemann Controls */}
             {showRiemannControls && areaPixel > 0 && !isProcessing && (
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-2xl shadow-xl border border-blue-200">
@@ -1155,16 +1197,20 @@ ${step.explanation}
                   <div>
                     <div className="flex justify-between items-center mb-3">
                       <label className="text-sm font-medium text-gray-700">
-                        Jumlah Interval (n):
+                        Jumlah Interval (n): {riemannIntervals}
                       </label>
                       <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">
-                        {riemannIntervals}
+                        Δx ={" "}
+                        {formatNumberWithDecimal(
+                          areaPixel / riemannIntervals,
+                          2
+                        )}
                       </span>
                     </div>
                     <input
                       type="range"
                       min="4"
-                      max="50"
+                      max="100"
                       step="1"
                       value={riemannIntervals}
                       onChange={(e) =>
@@ -1174,8 +1220,11 @@ ${step.explanation}
                     />
                     <div className="flex justify-between text-xs text-gray-500 mt-2">
                       <span className="text-red-600">Kasar (4)</span>
-                      <span className="text-blue-600">Optimal (10-20)</span>
-                      <span className="text-green-600">Halus (50)</span>
+                      <span className="text-blue-600">Optimal (20)</span>
+                      <span className="text-green-600">Halus (100)</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Total interval: 4-100 (semakin besar, semakin akurat)
                     </div>
                   </div>
 
@@ -1354,8 +1403,8 @@ ${step.explanation}
                 <div className="flex items-center text-sm text-gray-600">
                   <span className="mr-2">💡</span>
                   <span>
-                    Gunakan kontrol di samping untuk mengubah metode atau jumlah
-                    interval
+                    Gunakan slider di atas untuk mengubah jumlah interval
+                    Riemann (4-100)
                   </span>
                 </div>
               </div>
@@ -1457,7 +1506,7 @@ ${step.explanation}
                 {/* Calculation Summary */}
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-bold text-gray-700 mb-2">
-                    Ringkasan Perhitungan:
+                    Ringkasan Perhitungan Riemann:
                   </h4>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="text-sm">
@@ -1488,19 +1537,20 @@ ${step.explanation}
                     <div className="text-sm">
                       <span className="text-gray-500">Error:</span>
                       <span className="ml-2 font-medium">
-                        {riemannData && riemannData.length > 0
-                          ? `${Math.abs(
-                              ((areaPixel -
-                                riemannData.reduce(
-                                  (sum, d) => sum + d.area,
-                                  0
-                                )) /
-                                areaPixel) *
-                                100
-                            ).toFixed(2)}%`
-                          : "0.00%"}
+                        {totalRiemannArea > 0
+                          ? Math.abs(
+                              ((areaPixel - totalRiemannArea) / areaPixel) * 100
+                            ).toFixed(2)
+                          : "0.00"}
+                        
                       </span>
                     </div>
+                    {/* <div className="text-sm col-span-2">
+                      <span className="text-gray-500">Riemann Sum:</span>
+                      <span className="ml-2 font-medium">
+                        {formatNumberWithDecimal(totalRiemannArea, 2)} pixel²
+                      </span>
+                    </div> */}
                   </div>
                 </div>
               </div>
@@ -1513,21 +1563,26 @@ ${step.explanation}
                   <h2 className="text-xl font-semibold text-gray-800">
                     📈 Visualisasi Metode Riemann
                   </h2>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      riemannMethod === "left"
-                        ? "bg-red-100 text-red-700"
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        riemannMethod === "left"
+                          ? "bg-red-100 text-red-700"
+                          : riemannMethod === "right"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {riemannMethod === "left"
+                        ? "Riemann Kiri"
                         : riemannMethod === "right"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {riemannMethod === "left"
-                      ? "Riemann Kiri"
-                      : riemannMethod === "right"
-                      ? "Riemann Kanan"
-                      : "Riemann Titik Tengah"}
-                  </span>
+                        ? "Riemann Kanan"
+                        : "Riemann Titik Tengah"}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      n={riemannIntervals}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="relative">
@@ -1542,6 +1597,10 @@ ${step.explanation}
                       🔍 Interval 1-3 ditandai
                     </div>
                   )}
+                  <div className="absolute bottom-2 right-2 text-xs text-gray-500">
+                    Δx ={" "}
+                    {formatNumberWithDecimal(areaPixel / riemannIntervals, 2)}
+                  </div>
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1791,7 +1850,9 @@ ${step.explanation}
         <canvas ref={riemannCanvasRef} className="hidden"></canvas>
 
         <div className="mt-12 pt-8 border-t border-gray-200 text-center text-gray-500 text-sm">
-          <p>✨ Aplikasi Pengukur Luas Otomatis dengan Integral Riemann</p>
+          <p>
+            ✨ Aplikasi Pengukur Luas Otomatis dengan Integral Riemann (n=4-100)
+          </p>
           <a className="mt-2" href="https://farrassyuja.my.id/">
             Farras Syuja
           </a>
