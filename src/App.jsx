@@ -1035,7 +1035,7 @@ ${step.explanation}
             Visualisasi Integral & Pengukur Luas Otomatis
           </h1>
           <p className="text-gray-600 text-lg mt-3">
-            Unggah gambar → Hitung luas otomatis → Visualisasi Riemann (n=4-100)
+            Unggah gambar → Hitung luas otomatis → Visualisasi Riemann (n=4-1000)
           </p>
         </div>
 
