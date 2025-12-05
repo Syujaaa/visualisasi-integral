@@ -1082,7 +1082,7 @@ ${step.explanation}
                       ? "Lepaskan gambar di sini..."
                       : imgSrc
                       ? "Ganti Gambar"
-                      : "Unggah Gambar PNG"}
+                      : "Unggah Gambar"}
                   </p>
 
                   {imgSrc ? (
