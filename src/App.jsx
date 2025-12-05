@@ -27,7 +27,7 @@ export default function App() {
   const [areaPixel, setAreaPixel] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [riemannMethod, setRiemannMethod] = useState("midpoint");
-  const [riemannIntervals, setRiemannIntervals] = useState(20); // Default ke 20
+  const [riemannIntervals, setRiemannIntervals] = useState(20);
   const [riemannData, setRiemannData] = useState(null);
   const [showRiemannGraph, setShowRiemannGraph] = useState(false);
   const [mathExplanation, setMathExplanation] = useState("");
@@ -38,9 +38,12 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [calculationHistory, setCalculationHistory] = useState([]);
   const [totalRiemannArea, setTotalRiemannArea] = useState(0);
-
+  const [uploadedFile, setUploadedFile] = useState(null);
   const previewCanvasRef = useRef(null);
   const processedCanvasRef = useRef(null);
+  const [scaleType, setScaleType] = useState("cm");
+  const [scaleValue, setScaleValue] = useState(1);
+  const [realArea, setRealArea] = useState(0);
   const riemannCanvasRef = useRef(null);
 
   const formatNumber = (num) => {
@@ -50,36 +53,47 @@ export default function App() {
       .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   };
 
-  const formatNumberWithDecimal = (num, decimalPlaces = 2) => {
+  const formatNumberWithDecimal = (num) => {
     if (typeof num !== "number" || isNaN(num)) return "0";
 
-    const [integerPart, decimalPart = ""] = num
-      .toFixed(decimalPlaces)
-      .split(".");
+    const numStr = num.toString();
+    const [integerPart, decimalPart = ""] = numStr.split(".");
 
     const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
-    if (decimalPlaces > 0 && decimalPart && decimalPart !== "00") {
-      return `${formattedInteger}.${decimalPart}`;
+    if (decimalPart && decimalPart.replace(/0+$/, "") !== "") {
+      return `${formattedInteger}.${decimalPart.replace(/0+$/, "")}`;
     }
 
     return formattedInteger;
   };
 
+  useEffect(() => {
+    if (isProcessing) {
+      setRiemannMethod("midpoint");
+    }
+  }, [isProcessing]);
+
   const onDrop = useCallback((acceptedFiles) => {
     const file = acceptedFiles[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".png")) {
-      setError("Hanya format PNG yang diterima. Silakan upload file PNG.");
+    if (!file.type.startsWith("image/")) {
+      setError("Hanya file gambar yang diterima.");
       return;
     }
+
+    // if (!file.name.toLowerCase().endsWith(".png")) {
+    //   setError("Hanya format PNG yang diterima. Silakan upload file PNG.");
+    //   return;
+    // }
 
     setError("");
     setIsProcessing(true);
     setImgSrc(URL.createObjectURL(file));
     setProcessedImg(null);
     setAreaPixel(0);
+    setUploadedFile(file);
     setRiemannData(null);
     setShowRiemannGraph(false);
     setShowRiemannControls(false);
@@ -93,7 +107,9 @@ export default function App() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { "image/png": [".png"] },
+    accept: {
+      "image/*": [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"],
+    },
     maxFiles: 1,
   });
 
@@ -102,6 +118,33 @@ export default function App() {
       processImageAutomatically();
     }
   }, [imgSrc, isProcessing]);
+
+  const calculateRealArea = useCallback((areaInPixels, type, value) => {
+    if (!areaInPixels || areaInPixels <= 0) return;
+
+    let convertedArea;
+
+    switch (type) {
+      case "cm":
+        convertedArea = areaInPixels * Math.pow(value, 2);
+        break;
+      case "m":
+        convertedArea = areaInPixels * Math.pow(value, 2);
+        break;
+      case "pixel":
+      default:
+        convertedArea = areaInPixels;
+        break;
+    }
+
+    setRealArea(convertedArea);
+  }, []);
+
+  useEffect(() => {
+    if (areaPixel > 0) {
+      calculateRealArea(areaPixel, scaleType, scaleValue);
+    }
+  }, [areaPixel, scaleType, scaleValue, calculateRealArea]);
 
   const generateRiemannData = useCallback(
     (area, intervals = riemannIntervals) => {
@@ -855,7 +898,7 @@ Akurasi relatif:
 
     const link = document.createElement("a");
     link.href = processedImg;
-    link.download = `hasil_luas_${Date.now()}.png`;
+    link.download = `hasil_deteksi_kontur_${Date.now()}.png`;
     link.click();
   };
 
@@ -867,6 +910,13 @@ Akurasi relatif:
 
 LUAS GAMBAR: ${formatNumber(areaPixel)} pixel²
 ${formatNumberWithDecimal(areaPixel, 2)} pixel²
+
+KONVERSI SKALA:
+===================
+Satuan: ${scaleType}
+1 pixel = ${scaleValue} ${scaleType}
+Luas terkonversi: ${formatNumberWithDecimal(realArea, 4)} ${scaleType}²
+Faktor konversi: ${scaleValue}
 
 RIEMANN CALCULATION DETAILS:
 ===========================
@@ -948,8 +998,10 @@ ${step.explanation}
     setImgSrc(null);
     setProcessedImg(null);
     setAreaPixel(0);
+    setUploadedFile(null);
     setRiemannData(null);
     setShowRiemannGraph(false);
+    setRiemannMethod("midpoint");
     setShowRiemannControls(false);
     setMathExplanation("");
     setCalculationSteps([]);
@@ -983,8 +1035,7 @@ ${step.explanation}
             Visualisasi Integral & Pengukur Luas Otomatis
           </h1>
           <p className="text-gray-600 text-lg mt-3">
-            Unggah gambar PNG → Hitung luas otomatis → Visualisasi Riemann
-            (n=4-100)
+            Unggah gambar → Hitung luas otomatis → Visualisasi Riemann (n=4-100)
           </p>
         </div>
 
@@ -999,7 +1050,6 @@ ${step.explanation}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-8">
-            {/* Upload Box */}
             <div
               {...getRootProps()}
               className={`border-3 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 shadow-lg hover:shadow-xl relative
@@ -1034,9 +1084,7 @@ ${step.explanation}
                       ? "Ganti Gambar"
                       : "Unggah Gambar PNG"}
                   </p>
-                  <p className="text-gray-500 mt-2">
-                    Hanya format PNG • Perhitungan otomatis
-                  </p>
+
                   {imgSrc ? (
                     <div className="mt-4 text-sm text-blue-600">
                       ⚡ Klik atau drag & drop untuk mengganti gambar
@@ -1050,7 +1098,6 @@ ${step.explanation}
               )}
             </div>
 
-            {/* Original Image */}
             {imgSrc && (
               <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
@@ -1106,13 +1153,14 @@ ${step.explanation}
                     </div>
                   )}
                   <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                    PNG
+                    {uploadedFile
+                      ? uploadedFile.name.split(".").pop().toUpperCase()
+                      : "GAMBAR"}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Processing Indicator */}
             {imgSrc && isProcessing && (
               <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-2xl shadow-xl border border-amber-200">
                 <div className="flex items-center">
@@ -1132,7 +1180,6 @@ ${step.explanation}
               </div>
             )}
 
-            {/* Riemann Controls */}
             {showRiemannControls && areaPixel > 0 && !isProcessing && (
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-2xl shadow-xl border border-blue-200">
                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
@@ -1195,36 +1242,215 @@ ${step.explanation}
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <label className="text-sm font-medium text-gray-700">
-                        Jumlah Interval (n): {riemannIntervals}
-                      </label>
-                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">
-                        Δx ={" "}
-                        {formatNumberWithDecimal(
-                          areaPixel / riemannIntervals,
-                          2
-                        )}
-                      </span>
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-800">
+                          Jumlah Interval Riemann (n)
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                          Kontrol akurasi perhitungan integral
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-blue-600">
+                          n = {riemannIntervals}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Δx ={" "}
+                          {formatNumberWithDecimal(
+                            areaPixel / riemannIntervals
+                          )}{" "}
+                          pixel
+                        </div>
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min="4"
-                      max="100"
-                      step="1"
-                      value={riemannIntervals}
-                      onChange={(e) =>
-                        setRiemannIntervals(parseInt(e.target.value))
-                      }
-                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-2">
-                      <span className="text-red-600">Kasar (4)</span>
-                      <span className="text-blue-600">Optimal (20)</span>
-                      <span className="text-green-600">Halus (100)</span>
+
+                    <div className="relative mb-2">
+                      <input
+                        type="range"
+                        min="4"
+                        max="1000"
+                        step="1"
+                        value={riemannIntervals}
+                        onChange={(e) =>
+                          setRiemannIntervals(parseInt(e.target.value))
+                        }
+                        className="w-full h-3 bg-gradient-to-r from-red-200 via-blue-200 to-green-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+
+                      {/* Marker points */}
+                      <div className="absolute top-0 left-0 right-0 flex justify-between mt-4">
+                        <div className="text-center">
+                          <div className="w-2 h-2 bg-red-500 rounded-full mx-auto"></div>
+                          <div className="text-xs mt-1 text-red-600">4</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mx-auto"></div>
+                          <div className="text-xs mt-1 text-blue-600">100</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mx-auto"></div>
+                          <div className="text-xs mt-1 text-blue-600">200</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mx-auto"></div>
+                          <div className="text-xs mt-1 text-green-600">500</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mx-auto"></div>
+                          <div className="text-xs mt-1 text-green-600">
+                            1000
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Total interval: 4-100 (semakin besar, semakin akurat)
+
+                    <div className="grid grid-cols-3 gap-4 mt-6">
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="font-bold text-red-700 text-center">
+                          Kasar
+                        </div>
+                        <div className="text-sm text-red-600 text-center mt-1">
+                          n = 4-50
+                        </div>
+                        <div className="text-xs text-red-500 text-center mt-2">
+                          Δx besar
+                          <br />
+                          Cepat render
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="font-bold text-blue-700 text-center">
+                          Optimal
+                        </div>
+                        <div className="text-sm text-blue-600 text-center mt-1">
+                          n = 50-200
+                        </div>
+                        <div className="text-xs text-blue-500 text-center mt-2">
+                          Δx sedang
+                          <br />
+                          Akurasi baik
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="font-bold text-green-700 text-center">
+                          Halus
+                        </div>
+                        <div className="text-sm text-green-600 text-center mt-1">
+                          n = 200-1000
+                        </div>
+                        <div className="text-xs text-green-500 text-center mt-2">
+                          Δx kecil
+                          <br />
+                          Sangat akurat
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 text-sm text-gray-600">
+                      <div className="font-medium mb-1">Keterangan:</div>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>n = jumlah interval (partisi)</li>
+                        <li>
+                          Δx = lebar setiap interval (semakin kecil Δx, semakin
+                          akurat)
+                        </li>
+                        <li>
+                          Rekomendasi: n = 50-200 untuk keseimbangan akurasi dan
+                          performa
+                        </li>
+                        <li>Maksimal: n = 1000 untuk akurasi tertinggi</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <h4 className="text-lg font-semibold text-gray-800 mb-3">
+                      🎯 Konversi Skala
+                    </h4>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Pilih Satuan:
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: "cm", name: "Centimeter", icon: "📐" },
+                            { id: "m", name: "Meter", icon: "🏗️" },
+                          ].map((unit) => (
+                            <button
+                              key={unit.id}
+                              onClick={() => {
+                                setScaleType(unit.id);
+                                calculateRealArea(
+                                  areaPixel,
+                                  unit.id,
+                                  scaleValue
+                                );
+                              }}
+                              className={`py-2 px-3 rounded-lg font-medium flex flex-col items-center transition-all ${
+                                scaleType === unit.id
+                                  ? "bg-blue-100 border-2 border-blue-500 text-blue-700"
+                                  : "bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-200"
+                              }`}
+                            >
+                              <span className="text-xl mb-1">{unit.icon}</span>
+                              <span className="text-sm">{unit.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Konversi: 1 pixel =
+                        </label>
+                        <div className="flex items-center">
+                          <input
+                            type="number"
+                            min="0.001"
+                            max="1000"
+                            step="0.001"
+                            value={scaleValue}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0.001;
+                              setScaleValue(value);
+                              calculateRealArea(areaPixel, scaleType, value);
+                            }}
+                            className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="1.0"
+                          />
+                          <span className="ml-2 font-medium">
+                            {scaleType === "cm"
+                              ? "cm"
+                              : scaleType === "m"
+                              ? "m"
+                              : "pixel"}
+                          </span>
+                          <div className="ml-4 text-sm text-gray-500">
+                            : 1 pixel = {scaleValue} {scaleType} untuk skala
+                            umum
+                          </div>
+                        </div>
+                      </div>
+
+                      {scaleType !== "pixel" && realArea > 0 && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="font-medium text-green-800">
+                            📐 Skala Terkonversi:
+                          </div>
+                          <div className="text-green-700 mt-1">
+                            • 1 pixel = {scaleValue} {scaleType}
+                            <br />• Luas gambar:{" "}
+                            {formatNumberWithDecimal(realArea, 2)} {scaleType}²
+                            <br />• Faktor konversi:{" "}
+                            {formatNumberWithDecimal(scaleValue, 4)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1404,7 +1630,7 @@ ${step.explanation}
                   <span className="mr-2">💡</span>
                   <span>
                     Gunakan slider di atas untuk mengubah jumlah interval
-                    Riemann (4-100)
+                    Riemann (4-1000)
                   </span>
                 </div>
               </div>
@@ -1497,13 +1723,41 @@ ${step.explanation}
                     </div>
                   </div>
 
-                  {/* Overlay info */}
                   <div className="absolute top-4 right-4 bg-blue-600/80 text-white px-3 py-2 rounded-lg text-sm">
                     <div>OpenCV Contour Detection</div>
                   </div>
                 </div>
 
-                {/* Calculation Summary */}
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-bold text-gray-700 mb-2">
+                    Ringkasan Perhitungan:
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Luas (pixel):</span>
+                      <span className="font-medium">
+                        {formatNumber(areaPixel)} pixel²
+                      </span>
+                    </div>
+
+                    {scaleType !== "pixel" && realArea > 0 && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">
+                            Luas ({scaleType}):
+                          </span>
+                          <span className="font-medium text-green-600">
+                            {formatNumberWithDecimal(realArea)} {scaleType}²
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 pt-1 border-t border-gray-200">
+                          Konversi: 1 pixel = {scaleValue} {scaleType}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-bold text-gray-700 mb-2">
                     Ringkasan Perhitungan Riemann:
@@ -1542,7 +1796,6 @@ ${step.explanation}
                               ((areaPixel - totalRiemannArea) / areaPixel) * 100
                             ).toFixed(2)
                           : "0.00"}
-                        
                       </span>
                     </div>
                     {/* <div className="text-sm col-span-2">
@@ -1556,7 +1809,6 @@ ${step.explanation}
               </div>
             )}
 
-            {/* Riemann Graph Visualization */}
             {showRiemannGraph && riemannData && !isProcessing && (
               <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
@@ -1585,9 +1837,32 @@ ${step.explanation}
                   </div>
                 </div>
 
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className="text-xs text-gray-500">Preset umum:</span>
+                  {[
+                    { label: "1px = 0.1 cm", value: 0.1, type: "cm" },
+                    { label: "1px = 0.5 cm", value: 0.5, type: "cm" },
+                    { label: "1px = 0.01 m", value: 0.01, type: "m" },
+                    { label: "1px = 0.05 m", value: 0.05, type: "m" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() => {
+                        setScaleType(preset.type);
+                        setScaleValue(preset.value);
+                        calculateRealArea(areaPixel, preset.type, preset.value);
+                      }}
+                      className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="relative">
                   <canvas
                     ref={riemannCanvasRef}
+                    key={`riemann-${riemannMethod}-${riemannIntervals}`}
                     width={800}
                     height={400}
                     className="w-full h-80 border border-gray-300 rounded-xl bg-gradient-to-br from-gray-50 to-white"
@@ -1658,6 +1933,16 @@ ${step.explanation}
                     <div className="text-5xl font-extrabold text-blue-600 mb-2">
                       {formatNumber(areaPixel)} pixel²
                     </div>
+                    {scaleType !== "pixel" && realArea > 0 && (
+                      <>
+                        <div className="text-3xl font-extrabold text-blue-600 mb-2">
+                          {formatNumberWithDecimal(realArea, 4)} {scaleType}²
+                        </div>
+                        <div className="text-1xl text-blue-600 mb-2">
+                          Konversi: 1 pixel = {scaleValue} {scaleType}
+                        </div>
+                      </>
+                    )}
                     <p className="text-gray-600">
                       Luas berdasarkan integral kontur OpenCV
                     </p>
@@ -1747,6 +2032,25 @@ ${step.explanation}
                   />
                 </div>
 
+                <div className="text-center">
+                  <div className="text-5xl font-extrabold text-blue-600 mb-2">
+                    {formatNumber(areaPixel)} pixel²
+                  </div>
+                  {scaleType !== "pixel" && realArea > 0 && (
+                    <div className="text-2xl font-bold text-green-600 mb-2">
+                      ≈ {formatNumberWithDecimal(realArea, 2)} {scaleType}²
+                    </div>
+                  )}
+                  <p className="text-gray-600">
+                    Luas berdasarkan integral kontur OpenCV
+                  </p>
+                  {scaleType !== "pixel" && (
+                    <div className="text-sm text-gray-500 mt-2 mb-10">
+                      1 pixel = {scaleValue} {scaleType} • Skala: {scaleValue}:1
+                    </div>
+                  )}
+                </div>
+
                 {/* Formula Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 bg-gradient-to-br from-purple-50 to-white border border-purple-200 rounded-xl">
@@ -1825,14 +2129,15 @@ ${step.explanation}
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="text-6xl mb-4 text-gray-300">📐</div>
                   <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                    Tunggu Gambar PNG
+                    Tunggu Gambar
                   </h3>
                   <p className="text-gray-500 text-center">
-                    Upload gambar PNG di panel kiri untuk memulai perhitungan
+                    Upload gambar untuk memulai perhitungan
                   </p>
                   <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
                     <p className="text-sm text-blue-700 font-medium">
-                      📋 Hanya format PNG yang diterima
+                      📋 Format gambar diterima: PNG, JPG, JPEG, GIF, BMP, WebP,
+                      SVG
                     </p>
                     <p className="text-xs text-blue-600 mt-1">
                       Pastikan gambar memiliki kontras yang jelas untuk hasil
@@ -1851,9 +2156,12 @@ ${step.explanation}
 
         <div className="mt-12 pt-8 border-t border-gray-200 text-center text-gray-500 text-sm">
           <p>
-            ✨ Aplikasi Pengukur Luas Otomatis dengan Integral Riemann (n=4-100)
+            ✨ Aplikasi Pengukur Luas Otomatis dengan Integral Riemann (n=4-1000)
           </p>
-          <a className="mt-2" href="https://farrassyuja.my.id/">
+          <a
+            className="mt-2 text-blue-600 hover:text-blue-700 font-semibold transition-colors duration-200 gap-2"
+            href="https://farrassyuja.my.id/"
+          >
             Farras Syuja
           </a>
         </div>
